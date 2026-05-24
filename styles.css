@@ -2429,11 +2429,64 @@ a.nav-item { text-decoration: none; }
   font-feature-settings: "tnum";
 }
 /* =============================================================
-   EXEC SHARES GRID — 1.15fr · 1.5fr · 1.15fr
+   EXEC SHARES GRID — Map left (2fr, full height), charts stacked right (1fr)
    ============================================================= */
 .exec-shares-grid,
 .exec-shares-grid-4 {
-  grid-template-columns: 1.15fr 1.5fr 1.15fr !important;
+  display: grid !important;
+  grid-template-columns: 2fr 1fr !important;
+  grid-template-rows: 1fr 1fr !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+/* Map (3rd child) → left column, spans both rows */
+.exec-shares-grid > .exec-card:nth-child(3),
+.exec-shares-grid > .dac-map-card {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+}
+
+/* Dumbbell (1st child) → top right */
+.exec-shares-grid > .exec-card:nth-child(1) {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+}
+
+/* Strip (2nd child) → bottom right */
+.exec-shares-grid > .exec-card:nth-child(2) {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+}
+
+/* Mobile: stack vertically */
+@media (max-width: 1300px) {
+  .exec-shares-grid,
+  .exec-shares-grid-4 {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
+  }
+  .exec-shares-grid > .exec-card:nth-child(1),
+  .exec-shares-grid > .exec-card:nth-child(2),
+  .exec-shares-grid > .exec-card:nth-child(3),
+  .exec-shares-grid > .dac-map-card {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+}
+
+/* Map card stretches to fill its tall slot */
+/* Map card fills its slot — height driven by the right column */
+.exec-shares-grid > .dac-map-card {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+.exec-shares-grid > .dac-map-card > .dac-map-container {
+  flex: 1 !important;
+  height: auto !important;
+  min-height: 300px !important;
 }
 
 /* =============================================================
@@ -6453,3 +6506,270 @@ a.nav-item { text-decoration: none; }
 .bar-yoy-pill.bar-yoy-up      { background: var(--green-tint); color: var(--green); }
 .bar-yoy-pill.bar-yoy-down    { background: var(--red-tint);   color: var(--red); }
 .bar-yoy-pill.bar-yoy-neutral { background: var(--white-smoke); color: var(--text-3); }
+
+/* =============================================================
+   DAC MAP REDESIGN — floating county panel + inline legend in header
+   ============================================================= */
+
+/* Use the existing .dac-map-card but rearrange children visually */
+.dac-map-card {
+  position: relative;
+  overflow: hidden !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Header: title left, legend right */
+.dac-map-card .chart-card-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 12px 18px 10px !important;
+  border-bottom: 1px solid var(--line) !important;
+  margin-bottom: 0 !important;
+  flex-shrink: 0 !important;
+  background: var(--white) !important;
+  z-index: 600 !important;
+}
+.dac-map-card .chart-card-head h3 {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  margin: 0 0 2px 0 !important;
+}
+.dac-map-card .chart-card-head .chart-sub {
+  font-size: 10.5px !important;
+  color: var(--text-3) !important;
+  margin: 0 !important;
+}
+
+/* Move the legend OUT of its current spot, anchor it to the header (right side) */
+.dac-map-card .dac-map-legend {
+  position: absolute !important;
+  top: 14px !important;
+  right: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 10px !important;
+  z-index: 700 !important;
+}
+.dac-map-card .dac-map-legend-label {
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  color: var(--text-3) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  margin-right: 2px !important;
+}
+.dac-map-card .dac-map-leg-swatch {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 2px !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+}
+.dac-map-card .dac-map-leg-text {
+  font-size: 9.5px !important;
+  color: var(--text-3) !important;
+  margin-right: 4px !important;
+}
+
+/* Hide the original county bar (we'll re-render it floating, see below) */
+.dac-map-card > .dac-map-county-bar {
+  position: absolute !important;
+  top: 60px !important;
+  right: 12px !important;
+  z-index: 500 !important;
+  background: rgba(255,255,255,0.97) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 0 rgba(15,23,42,0.02), 0 4px 16px rgba(15,23,42,0.06) !important;
+  padding: 10px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  width: 165px !important;
+  flex-wrap: nowrap !important;
+}
+
+/* Header label inside the floating panel (added via ::before) */
+.dac-map-card > .dac-map-county-bar::before {
+  content: 'COUNTIES / BOROUGHS' !important;
+  display: block !important;
+  font-size: 9px !important;
+  letter-spacing: 0.1em !important;
+  color: var(--text-3) !important;
+  font-weight: 600 !important;
+  margin-bottom: 8px !important;
+}
+
+/* Restyle each borough button as a pill row */
+.dac-map-card .dac-map-county-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 5px 10px !important;
+  margin-bottom: 3px !important;
+  background: rgba(255,255,255,0.5) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  color: var(--text) !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.15s !important;
+  text-align: left !important;
+}
+.dac-map-card .dac-map-county-btn::before {
+  content: '' !important;
+  display: inline-block !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background: #ea580c !important;
+  flex-shrink: 0 !important;
+}
+.dac-map-card .dac-map-county-btn:hover {
+  background: var(--bright-snow) !important;
+  border-color: var(--text-4) !important;
+  color: var(--dusk) !important;
+}
+.dac-map-card .dac-map-county-btn.active {
+  background: var(--dusk) !important;
+  border-color: var(--dusk) !important;
+  color: var(--white) !important;
+}
+.dac-map-card .dac-map-county-btn.active::before {
+  background: #fb923c !important;
+}
+
+/* Map container fills the rest of the card */
+.dac-map-card > div[style*="position:relative"],
+.dac-map-card > div[style*="position: relative"] {
+  flex: 1 !important;
+  position: relative !important;
+  min-height: 0 !important;
+}
+.dac-map-card .dac-map-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 480px !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+/* Hide Leaflet's default zoom (we don't want it on this design) */
+.dac-map-card .leaflet-control-zoom {
+  display: none !important;
+}
+
+/* Compactar filas del Strip y Dumbbell en exec summary */
+.exec-shares-grid .strip-body,
+.exec-shares-grid .dumb-body {
+  gap: 0 !important;
+}
+
+.exec-shares-grid .strip-row {
+  min-height: 26px !important;
+  padding: 1px 4px !important;
+}
+
+.exec-shares-grid .dumb-row {
+  min-height: 26px !important;
+  padding: 1px 4px !important;
+}
+
+/* Reducir altura de las barras */
+.exec-shares-grid .strip-bar {
+  height: 16px !important;
+}
+.exec-shares-grid .dumb-bar {
+  height: 16px !important;
+}
+
+/* Hide subtitles in exec summary DAC Equity cards */
+.exec-shares-grid .exec-card .chart-card-head .chart-sub {
+  display: none !important;
+}
+
+.dac-tt-meta {
+  font-size: 10px;
+  color: var(--text-3);
+  margin: 2px 0 6px;
+  line-height: 1.3;
+}
+.dac-tt-section {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--dusk);
+  margin: 6px 0 2px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.dac-tt-section:first-of-type { border-top: none; padding-top: 0; }
+
+.dac-map-tooltip {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-width: 200px;
+  max-width: 260px;
+  font-size: 11px;
+  color: var(--text-2);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.dac-tt-geoid {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.01em;
+}
+.dac-tt-county {
+  font-size: 10.5px;
+  color: var(--text-2);
+  margin-top: 1px;
+}
+.dac-tt-meta {
+  font-size: 10px;
+  color: var(--text-3);
+  margin: 4px 0 6px;
+  line-height: 1.35;
+}
+.dac-tt-section {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--dusk);
+  margin: 6px 0 3px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.dac-tt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10.5px;
+  padding: 1px 0;
+}
+.dac-tt-row > span:first-child { color: var(--text-3); }
+.dac-tt-v {
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.dac-tt-empty {
+  font-size: 10px;
+  color: var(--text-4);
+  font-style: italic;
+  padding: 2px 0 4px;
+}

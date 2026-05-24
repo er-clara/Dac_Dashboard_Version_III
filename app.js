@@ -1415,7 +1415,7 @@
         <div class="dac-map-county-bar" style="flex-wrap:nowrap;gap:4px">${btnHtml}</div>
         <div style="position:relative;flex:1">
           <div id="${mapId}" class="dac-map-container"></div>
-          <div id="dac-map-tooltip" class="dac-map-tooltip" style="display:none;position:absolute;z-index:9999;pointer-events:none"></div>
+          <div id="dac-map-tooltip" class="dac-map-tooltip" style="opacity:0;position:absolute;z-index:9999;pointer-events:none;transition:opacity .12s"></div>
         </div>
       </div>
     `;
@@ -1458,6 +1458,13 @@
     }).addTo(map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
+    map.on('mouseout', function() {
+      if (_hoveredLayer) {
+        geoLayer.resetStyle(_hoveredLayer);
+        _hoveredLayer = null;
+      }
+      if (tooltip) tooltip.style.opacity = '0';
+    });
 
     function styleFeature(feature) {
       const active = _mapState.county;
@@ -1476,27 +1483,61 @@
     const tooltipWrapper = container.parentElement;
     const tooltip = tooltipWrapper ? tooltipWrapper.querySelector('#dac-map-tooltip') : null;
 
+    let _hoveredLayer = null;
+
     function onEach(feature, layer) {
       const p = feature.properties;
       layer.on('mouseover', function() {
+        // Clear any previously hovered layer that didn't get mouseout
+        if (_hoveredLayer && _hoveredLayer !== this) {
+          geoLayer.resetStyle(_hoveredLayer);
+        }
+        _hoveredLayer = this;
         this.setStyle({ weight: 2, color: '#e87722', fillOpacity: 0.92 });
         this.bringToFront();
         if (!tooltip) return;
-        const score  = p.Comb_Sc   != null ? parseFloat(p.Comb_Sc).toFixed(1)   : '—';
-        const rankSt = p.Rank_State != null ? parseFloat(p.Rank_State).toFixed(1) : '—';
-        const pop    = p.Pop_Cnt    != null ? parseInt(p.Pop_Cnt).toLocaleString() : '—';
-        const eAdj   = p.elec_adj   != null ? '$' + parseFloat(p.elec_adj).toFixed(2)  : '—';
-        const gAdj   = p.gas_adj    != null ? '$' + parseFloat(p.gas_adj).toFixed(2)   : '—';
-        const eAccts = p.elec_accts != null ? parseInt(p.elec_accts).toLocaleString()  : '—';
+
+        const fmtInt = v => v != null && isFinite(v) ? Math.round(v).toLocaleString() : null;
+        const fmtMon = v => {
+          if (v == null || !isFinite(v)) return null;
+          const n = parseFloat(v);
+          const sign = n < 0 ? '-' : '';
+          const abs = Math.abs(n);
+          if (abs >= 1e6) return sign + '$' + (abs / 1e6).toFixed(2) + 'M';
+          if (abs >= 1e3) return sign + '$' + (abs / 1e3).toFixed(1) + 'K';
+          return sign + '$' + abs.toFixed(2);
+        };
+
+        const score   = p.Comb_Sc    != null ? parseFloat(p.Comb_Sc).toFixed(1) : '—';
+        const rankSt  = p.Rank_State != null ? parseFloat(p.Rank_State).toFixed(1) + '%' : '—';
+        const pop     = fmtInt(p.Pop_Cnt) || '—';
+        const dacDesig = p.DAC_Desig || '';
+
+        // Header: County · DAC_Desig
+        const subline = [p.County, dacDesig].filter(Boolean).join(' · ');
+
+        // Helper to render a utility block, or a "no data" pane
+        function utilityBlock(label, classV, accts, eap, adj) {
+          const has = (accts != null) || (eap != null) || (adj != null);
+          if (!has) {
+            return '<div class="dac-tt-section">' + label + '</div>' +
+                   '<div class="dac-tt-empty">No ConEd ' + label.toLowerCase() + ' data for this tract</div>';
+          }
+          let rows = '';
+          if (classV)        rows += '<div class="dac-tt-row"><span>Customer class</span><span class="dac-tt-v">' + classV + '</span></div>';
+          if (accts != null) rows += '<div class="dac-tt-row"><span>Accounts</span><span class="dac-tt-v">' + fmtInt(accts) + '</span></div>';
+          if (eap != null)   rows += '<div class="dac-tt-row"><span>EAP enrolled</span><span class="dac-tt-v">' + fmtInt(eap) + '</span></div>';
+          if (adj != null)   rows += '<div class="dac-tt-row"><span>Bill adjustment</span><span class="dac-tt-v">' + fmtMon(adj) + '</span></div>';
+          return '<div class="dac-tt-section">' + label + '</div>' + rows;
+        }
+
         tooltip.innerHTML =
           '<div class="dac-tt-geoid">' + (p.GEOID || '') + '</div>' +
-          '<div class="dac-tt-county">' + (p.County || '') + '</div>' +
-          '<div class="dac-tt-row"><span>Combined Score</span><span class="dac-tt-v">' + score + '</span></div>' +
-          '<div class="dac-tt-row"><span>State Rank</span><span class="dac-tt-v">' + rankSt + '</span></div>' +
-          '<div class="dac-tt-row"><span>Population</span><span class="dac-tt-v">' + pop + '</span></div>' +
-          '<div class="dac-tt-row"><span>Elec. adj.</span><span class="dac-tt-v">' + eAdj + '</span></div>' +
-          '<div class="dac-tt-row"><span>Gas adj.</span><span class="dac-tt-v">' + gAdj + '</span></div>' +
-          '<div class="dac-tt-row"><span>Elec. accts</span><span class="dac-tt-v">' + eAccts + '</span></div>';
+          '<div class="dac-tt-county">' + subline + '</div>' +
+          '<div class="dac-tt-meta">Score ' + score + ' · State rank ' + rankSt + ' · pop ' + pop + '</div>' +
+          utilityBlock('Electric', p.elec_dac, p.elec_accts, p.elec_eap, p.elec_adj) +
+          utilityBlock('Gas',      p.gas_dac,  p.gas_accts,  p.gas_eap,  p.gas_adj);
+
         tooltip.style.opacity = '1';
       });
       layer.on('mousemove', function(e) {
@@ -1515,6 +1556,7 @@
       });
       layer.on('mouseout', function() {
         geoLayer.resetStyle(this);
+        if (_hoveredLayer === this) _hoveredLayer = null;
         if (tooltip) tooltip.style.opacity = '0';
       });
     }
