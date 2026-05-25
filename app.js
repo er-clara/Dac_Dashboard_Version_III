@@ -1377,7 +1377,81 @@
   }
 
   const _mapState = { county: null };
+// Compute and render KPI overlay for the DAC map
+  function renderMapKPI(geo, county) {
+    if (!geo || !geo.features) return;
+    const panel = document.getElementById('dac-map-kpi');
+    if (!panel) return;
 
+    // Filter features by county if one is selected
+    const feats = county
+      ? geo.features.filter(f => f.properties.County === county)
+      : geo.features;
+
+    // Aggregate counts
+    let dacN = 0, ndacN = 0;
+    let dacElecAcc = 0, ndacElecAcc = 0;
+    let dacGasAcc  = 0, ndacGasAcc  = 0;
+    let dacElecEap = 0, ndacElecEap = 0;
+    let dacGasEap  = 0, ndacGasEap  = 0;
+
+    feats.forEach(f => {
+      const p = f.properties;
+      const isDAC = p.DAC_Desig === 'Designated as DAC';
+      if (isDAC) {
+        dacN++;
+        dacElecAcc += (p.elec_accts || 0);
+        dacGasAcc  += (p.gas_accts  || 0);
+        dacElecEap += (p.elec_eap   || 0);
+        dacGasEap  += (p.gas_eap    || 0);
+      } else {
+        ndacN++;
+        ndacElecAcc += (p.elec_accts || 0);
+        ndacGasAcc  += (p.gas_accts  || 0);
+        ndacElecEap += (p.elec_eap   || 0);
+        ndacGasEap  += (p.gas_eap    || 0);
+      }
+    });
+
+    const fmtBig = v => {
+      if (v == null || !isFinite(v)) return '—';
+      if (v >= 1e6) return (v/1e6).toFixed(2) + 'M';
+      if (v >= 1e3) return (v/1e3).toFixed(0) + 'K';
+      return String(Math.round(v));
+    };
+    const pct = (num, den) => {
+      if (!den || den <= 0) return '—';
+      return (num/den*100).toFixed(1) + '%';
+    };
+
+    const scopeLabel = county
+      ? (county === 'Kings' ? 'Brooklyn'
+        : county === 'New York' ? 'Manhattan'
+        : county === 'Richmond' ? 'Staten Is.'
+        : county)
+      : 'All boroughs';
+
+    panel.innerHTML =
+      '<div class="dac-kpi-head">' +
+        '<span class="dac-kpi-eyebrow">Service area</span>' +
+        '<span class="dac-kpi-scope">' + scopeLabel + '</span>' +
+      '</div>' +
+      '<div class="dac-kpi-card dac-kpi-card-dac">' +
+        '<p class="dac-kpi-label">DAC tracts</p>' +
+        '<p class="dac-kpi-value">' + dacN.toLocaleString() + '</p>' +
+        '<p class="dac-kpi-sub">' + fmtBig(dacElecAcc) + ' elec · ' + fmtBig(dacGasAcc) + ' gas</p>' +
+      '</div>' +
+      '<div class="dac-kpi-card dac-kpi-card-ndac">' +
+        '<p class="dac-kpi-label">Non-DAC tracts</p>' +
+        '<p class="dac-kpi-value">' + ndacN.toLocaleString() + '</p>' +
+        '<p class="dac-kpi-sub">' + fmtBig(ndacElecAcc) + ' elec · ' + fmtBig(ndacGasAcc) + ' gas</p>' +
+      '</div>' +
+      '<div class="dac-kpi-card">' +
+        '<p class="dac-kpi-label">EAP enrolled (electric)</p>' +
+        '<div class="dac-kpi-row"><span class="dac-kpi-row-k dac-kpi-row-dac">DAC</span><span class="dac-kpi-row-v">' + pct(dacElecEap, dacElecAcc) + '</span></div>' +
+        '<div class="dac-kpi-row"><span class="dac-kpi-row-k dac-kpi-row-ndac">Non-DAC</span><span class="dac-kpi-row-v">' + pct(ndacElecEap, ndacElecAcc) + '</span></div>' +
+      '</div>';
+  }
   function renderDACMap(baseline, year, sections) {
     const mapId = 'dac-leaflet-map-' + Date.now();
     window._dacMapContainerId = mapId;
@@ -1418,6 +1492,7 @@
         <div class="dac-map-county-bar" style="flex-wrap:nowrap;gap:4px">${btnHtml}</div>
         <div style="position:relative;flex:1">
           <div id="${mapId}" class="dac-map-container"></div>
+          <div id="dac-map-kpi" class="dac-map-kpi-panel"></div>
           <div id="dac-map-tooltip" class="dac-map-tooltip" style="opacity:0;position:absolute;z-index:9999;pointer-events:none;transition:opacity .12s"></div>
         </div>
       </div>
@@ -1580,10 +1655,14 @@
       onEachFeature: onEach,
     }).addTo(map);
     _mapGeoLayer = geoLayer;
+    // Initial KPI render
+    renderMapKPI(geo, _mapState.county);
 
-    // Fit with extra padding so tracts aren't clipped at the edges
-    const defaultBounds = geoLayer.getBounds();
-    map.setView([40.7128, -73.9], 10);
+    // Use fixed initial view so "All" returns here (geoLayer bounds extend too far north into Westchester)
+    const initialCenter = [40.93, -73.9];
+    const initialZoom = 9.7;
+    map.setView(initialCenter, initialZoom);
+    const defaultBounds = geoLayer.getBounds();  // kept for reference but not used as the "All" target
 
     // County filter
     const bar = document.querySelector('.dac-map-county-bar');
@@ -1597,6 +1676,7 @@
           b.classList.toggle('active', (b.dataset.county || null) === county);
         });
         geoLayer.setStyle(styleFeature);
+        renderMapKPI(geo, county);
         if (county) {
           const filtered = [];
           geoLayer.eachLayer(l => {
@@ -1607,7 +1687,7 @@
             map.flyToBounds(group.getBounds(), { padding: [5, 5], duration: 0.5 });
           }
         } else {
-          map.flyToBounds(defaultBounds, { padding: [5, 5], duration: 0.5 });
+          map.flyTo(initialCenter, initialZoom, { duration: 0.5 });
         }
       });
     }
