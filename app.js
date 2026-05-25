@@ -1363,7 +1363,9 @@
     return _mapGeoCache;
   }
 
-  function dacMapColor(score) {
+  function dacMapColor(score, isDAC) {
+    // Non-DAC tracts: uniform light gray (no score-based coloring)
+    if (isDAC === false) return '#a8a8a8';
     if (score == null || score === '') return '#b8b8b8';
     const s = parseFloat(score);
     if (isNaN(s))  return '#b8b8b8';
@@ -1410,7 +1412,8 @@
           <span class="dac-map-leg-swatch" style="background:#2f5496"></span><span class="dac-map-leg-text">100–109</span>
           <span class="dac-map-leg-swatch" style="background:#1e4d80"></span><span class="dac-map-leg-text">110–119</span>
           <span class="dac-map-leg-swatch" style="background:#0a2540"></span><span class="dac-map-leg-text">120+</span>
-          <span class="dac-map-leg-swatch" style="background:#b8b8b8"></span><span class="dac-map-leg-text">N/A</span>
+          <span class="dac-map-leg-swatch" style="background:#e8e8e8"></span><span class="dac-map-leg-text">Non-DAC</span>
+<span class="dac-map-leg-swatch" style="background:#b8b8b8"></span><span class="dac-map-leg-text">N/A</span>
         </div>
         <div class="dac-map-county-bar" style="flex-wrap:nowrap;gap:4px">${btnHtml}</div>
         <div style="position:relative;flex:1">
@@ -1470,9 +1473,10 @@
       const active = _mapState.county;
       const fCounty = feature.properties.County;
       const dimmed = active && fCounty !== active;
+      const isDAC = feature.properties.DAC_Desig === 'Designated as DAC';
       return {
-        fillColor: dacMapColor(feature.properties.Comb_Sc),
-        fillOpacity: dimmed ? 0.12 : 0.78,
+        fillColor: dacMapColor(feature.properties.Comb_Sc, isDAC),
+        fillOpacity: dimmed ? 0.12 : (isDAC ? 0.78 : 0.55),
         color: '#ffffff',
         weight: 0.6,
         opacity: dimmed ? 0.2 : 1,
@@ -1508,13 +1512,20 @@
           return sign + '$' + abs.toFixed(2);
         };
 
-        const score   = p.Comb_Sc    != null ? parseFloat(p.Comb_Sc).toFixed(1) : '—';
-        const rankSt  = p.Rank_State != null ? parseFloat(p.Rank_State).toFixed(1) + '%' : '—';
-        const pop     = fmtInt(p.Pop_Cnt) || '—';
         const dacDesig = p.DAC_Desig || '';
-
-        // Header: County · DAC_Desig
+        const isDAC = dacDesig === 'Designated as DAC';
         const subline = [p.County, dacDesig].filter(Boolean).join(' · ');
+
+        // Score/Rank/Pop line: only for DAC tracts (Non-DAC don't have these)
+        let metaLine = '';
+        if (isDAC && p.Comb_Sc != null) {
+          const score  = parseFloat(p.Comb_Sc).toFixed(1);
+          const rankSt = p.Rank_State != null ? parseFloat(p.Rank_State).toFixed(1) + '%' : '—';
+          const pop    = fmtInt(p.Pop_Cnt) || '—';
+          metaLine = '<div class="dac-tt-meta">Score ' + score + ' · State rank ' + rankSt + ' · pop ' + pop + '</div>';
+        } else if (p.Pop_Cnt != null) {
+          metaLine = '<div class="dac-tt-meta">pop ' + (fmtInt(p.Pop_Cnt) || '—') + '</div>';
+        }
 
         
 
@@ -1525,7 +1536,7 @@
           const eapF   = fmtInt(eap);
 
           if (acctsF == null && eapF == null) {
-            html += '<div class="dac-tt-empty">No ConEd ' + label.toLowerCase() + ' data for this tract</div>';
+            html += '<div class="dac-tt-empty">Outside ConEd ' + label.toLowerCase() + ' service area</div>';
             return html;
           }
 
@@ -1537,7 +1548,7 @@
         tooltip.innerHTML =
           '<div class="dac-tt-geoid">' + (p.GEOID || '') + '</div>' +
           '<div class="dac-tt-county">' + subline + '</div>' +
-          '<div class="dac-tt-meta">Score ' + score + ' · State rank ' + rankSt + ' · pop ' + pop + '</div>' +
+          metaLine +
           utilityBlock('Electric', p.elec_accts, p.elec_eap) +
           utilityBlock('Gas',      p.gas_accts,  p.gas_eap);
 
