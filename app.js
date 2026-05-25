@@ -1516,27 +1516,30 @@
         // Header: County · DAC_Desig
         const subline = [p.County, dacDesig].filter(Boolean).join(' · ');
 
+        
+
         // Helper to render a utility block, or a "no data" pane
-        function utilityBlock(label, classV, accts, eap, adj) {
-          const has = (accts != null) || (eap != null) || (adj != null);
-          if (!has) {
-            return '<div class="dac-tt-section">' + label + '</div>' +
-                   '<div class="dac-tt-empty">No ConEd ' + label.toLowerCase() + ' data for this tract</div>';
+        function utilityBlock(label, accts, eap) {
+          let html = '<div class="dac-tt-section">' + label + '</div>';
+          const acctsF = fmtInt(accts);
+          const eapF   = fmtInt(eap);
+
+          if (acctsF == null && eapF == null) {
+            html += '<div class="dac-tt-empty">No ConEd ' + label.toLowerCase() + ' data for this tract</div>';
+            return html;
           }
-          let rows = '';
-          if (classV)        rows += '<div class="dac-tt-row"><span>Customer class</span><span class="dac-tt-v">' + classV + '</span></div>';
-          if (accts != null) rows += '<div class="dac-tt-row"><span>Accounts</span><span class="dac-tt-v">' + fmtInt(accts) + '</span></div>';
-          if (eap != null)   rows += '<div class="dac-tt-row"><span>EAP enrolled</span><span class="dac-tt-v">' + fmtInt(eap) + '</span></div>';
-          if (adj != null)   rows += '<div class="dac-tt-row"><span>Bill adjustment</span><span class="dac-tt-v">' + fmtMon(adj) + '</span></div>';
-          return '<div class="dac-tt-section">' + label + '</div>' + rows;
+
+          if (acctsF != null) html += '<div class="dac-tt-row"><span>Accounts</span><span class="dac-tt-v">' + acctsF + '</span></div>';
+          if (eapF   != null) html += '<div class="dac-tt-row"><span>EAP enrolled</span><span class="dac-tt-v">' + eapF + '</span></div>';
+          return html;
         }
 
         tooltip.innerHTML =
           '<div class="dac-tt-geoid">' + (p.GEOID || '') + '</div>' +
           '<div class="dac-tt-county">' + subline + '</div>' +
           '<div class="dac-tt-meta">Score ' + score + ' · State rank ' + rankSt + ' · pop ' + pop + '</div>' +
-          utilityBlock('Electric', p.elec_dac, p.elec_accts, p.elec_eap, p.elec_adj) +
-          utilityBlock('Gas',      p.gas_dac,  p.gas_accts,  p.gas_eap,  p.gas_adj);
+          utilityBlock('Electric', p.elec_accts, p.elec_eap) +
+          utilityBlock('Gas',      p.gas_accts,  p.gas_eap);
 
         tooltip.style.opacity = '1';
       });
